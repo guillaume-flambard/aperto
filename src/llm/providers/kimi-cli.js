@@ -7,14 +7,11 @@
  */
 
 const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
 
 class KimiCliProvider {
   constructor(config) {
     this.model = config.model || 'kimi-k2-turbo-preview';
-    this.timeout = config.timeout || 120000;
+    this.timeout = config.timeout || 300000; // 5 minutes for full analysis
     this.baseUrl = config.baseUrl || 'https://api.moonshot.ai';
   }
 
@@ -47,14 +44,12 @@ class KimiCliProvider {
       throw new Error('Kimi CLI not found or not authenticated. Run: kimi login');
     }
 
-    const maxTokens = options.maxTokens || 4000;
-    
     return new Promise((resolve, reject) => {
       // Build the kimi command with proper arguments
+      // Note: Removed --max-steps-per-turn to allow Kimi to complete the full analysis naturally
       const args = [
         '--print',
         '--output-format', 'text',
-        '--max-steps-per-turn', '1',
         '--prompt', prompt
       ];
 
@@ -81,7 +76,6 @@ class KimiCliProvider {
         }
 
         // Parse the output
-        // Kimi CLI outputs structured text, we need to extract the actual response
         const content = this.parseKimiOutput(stdout);
         
         resolve({
@@ -89,7 +83,7 @@ class KimiCliProvider {
           tokens: this.estimateTokens(content),
           promptTokens: this.estimateTokens(prompt),
           completionTokens: this.estimateTokens(content),
-          cost: 0 // Cannot calculate cost with CLI
+          cost: 0
         });
       });
 
@@ -103,74 +97,105 @@ class KimiCliProvider {
    * Parse Kimi CLI output to extract the actual response
    */
   parseKimiOutput(output) {
-    // Kimi CLI outputs structured data with TextPart containing the response
-    // The text content can span multiple lines and include special characters
-    
-    // Extract all TextPart text fields - handle multiline content
+    // Find TextPart sections and extract the text field
     const textParts = [];
+    let pos = 0;
     
-    // Match TextPart with multiline text (using non-greedy match for text field)
-    const textPartRegex = /text=['"]([\s\S]*?)['"],?\s*\n/g;
-    let match;
-    
-    while ((match = textPartRegex.exec(output)) !== null) {
-      // Clean up the extracted text
-      let text = match[1]
-        .replace(/\\n/g, '\n')  // Unescape newlines
-        .replace(/\\"/g, '"')  // Unescape quotes
-        .replace(/\\'/g, "'");  // Unescape single quotes
-      textParts.push(text);
+    while (true) {
+      // Find TextPart
+      const textPartIndex = output.indexOf('TextPart(', pos);
+      if (textPartIndex === -1) break;
+      
+      // Find text= within this TextPart
+      const textFieldIndex = output.indexOf('text=', textPartIndex);
+      if (textFieldIndex === -1) break;
+      
+      // Get the quote character (" or ')
+      let valueStart = textFieldIndex + 5;
+      const quote = output[valueStart];
+      if (quote !== '"' && quote !== "'") break;
+      
+      valueStart++; // Move past opening quote
+      
+      // Parse the string value handling escapes
+      let value = '';
+      let escaped = false;
+      let i = valueStart;
+      
+      while (i < output.length) {
+        const char = output[i];
+        
+        if (escaped) {
+          // Handle escape sequences
+          switch (char) {
+            case 'n': value += '\n'; break;
+            case 't': value += '\t'; break;
+            case 'r': value += '\r'; break;
+            case '\\': value += '\\'; break;
+            case '"': value += '"'; break;
+            case "'": value += "'"; break;
+            default: value += char; break;
+          }
+          escaped = false;
+        } else if (char === '\\') {
+          escaped = true;
+        } else if (char === quote) {
+          // End of string
+          break;
+        } else {
+          value += char;
+        }
+        i++;
+      }
+      
+      textParts.push(value);
+      pos = i + 1; // Continue after this TextPart
     }
     
     if (textParts.length > 0) {
       return textParts.join('\n');
     }
 
-    // Fallback: Try to extract everything after the first TextPart header
-    const textIndex = output.indexOf('text=');
-    if (textIndex !== -1) {
-      // Find the end of the text value
-      let start = textIndex + 5; // Skip 'text='
-      let quote = output[start];
-      if (quote === '"' || quote === "'") {
-        start++;
-        let end = start;
-        let escaped = false;
-        
-        while (end < output.length) {
-          if (escaped) {
-            escaped = false;
-          } else if (output[end] === '\\') {
-            escaped = true;
-          } else if (output[end] === quote) {
-            break;
-          }
-          end++;
+    // Fallback: just return everything after the prompt
+    const lines = output.split('\n');
+    let result = [];
+    let inTextPart = false;
+    
+    for (const line of lines) {
+      if (line.includes('TextPart(')) {
+        inTextPart = true;
+      }
+      if (inTextPart && line.trim() && !line.match(/^(TextPart|type=|think=|encrypted=|\))/)) {
+        // Extract content from text field lines
+        const match = line.match(/text=["'](.+)["']/);
+        if (match) {
+          result.push(match[1].replace(/\\n/g, '\n'));
         }
-        
-        return output.substring(start, end)
-          .replace(/\\n/g, '\n')
-          .replace(/\\"/g, '"')
-          .replace(/\\'/g, "'");
+      }
+      if (line.trim() === ')' && inTextPart) {
+        inTextPart = false;
       }
     }
+    
+    if (result.length > 0) {
+      return result.join('\n');
+    }
 
-    // Last resort: return cleaned raw output
+    // Last resort: return raw output minus metadata
     return output
-      .split('\n')
-      .filter(line => !line.match(/^(TurnBegin|TurnEnd|StepBegin|StatusUpdate|TokenUsage|ThinkPart)/))
-      .filter(line => !line.match(/^\s*\w+Part\(/))
-      .filter(line => !line.match(/^\s*(type|think|text|encrypted)=/))
-      .filter(line => line.trim().length > 0)
-      .join('\n')
+      .replace(/^TurnBegin[\s\S]*?StepBegin\(n=1\)\n/, '')
+      .replace(/ThinkPart\([\s\S]*?\)\n/, '')
+      .replace(/TextPart\(\s*type='text',\s*text="/, '')
+      .replace(/"\s*\)\nStatusUpdate[\s\S]*?TurnEnd\(\)/, '')
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
       .trim();
   }
 
   /**
-   * Rough token estimation (very approximate)
+   * Rough token estimation
    */
   estimateTokens(text) {
-    // Rough estimate: ~4 characters per token
     return Math.ceil(text.length / 4);
   }
 

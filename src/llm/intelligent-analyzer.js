@@ -34,14 +34,12 @@ class IntelligentProjectAnalyzer {
   async collectProjectFiles() {
     const files = {};
     
-    // Collect files from key directories
+    // Collect files from key directories - REDUCED LIMITS for CLI compatibility
     const directories = [
-      { path: 'app/Models', limit: 20 },
-      { path: 'app/Services', limit: 15 },
-      { path: 'app/Actions', limit: 10 },
-      { path: 'app/ValueObjects', limit: 10 },
-      { path: 'app/Http/Controllers', limit: 20 },
-      { path: 'tests', limit: 15 }
+      { path: 'app/Models', limit: 10 },
+      { path: 'app/Services', limit: 5 },
+      { path: 'app/Actions', limit: 5 },
+      { path: 'app/Http/Controllers', limit: 10 }
     ];
 
     for (const dir of directories) {
@@ -55,8 +53,10 @@ class IntelligentProjectAnalyzer {
         for (const filePath of phpFiles) {
           try {
             const relativePath = path.relative(this.projectPath, filePath);
+            // Only read first 50 lines to reduce size
             const content = await fs.readFile(filePath, 'utf8');
-            files[key].push({ path: relativePath, content });
+            const truncatedContent = content.split('\n').slice(0, 50).join('\n');
+            files[key].push({ path: relativePath, content: truncatedContent });
           } catch (e) {}
         }
       } catch (e) {
@@ -112,35 +112,19 @@ class IntelligentProjectAnalyzer {
   }
 
   buildDeepAnalysisPrompt(files) {
-    return `Analyze this Laravel project deeply and extract:
+    return `Analyze the Laravel project at ${this.projectPath} and provide insights on:
 
-1. BUSINESS DOMAINS - What are the main business areas?
-2. CRITICAL RULES - What are the key business rules that MUST be tested?
-3. PATTERNS - What architectural patterns are used?
-4. ENTITIES - Main models and their relationships
-5. SERVICES - Key business logic services
-6. EDGE CASES - What complex scenarios exist?
-7. TESTING GAPS - What critical logic is untested?
+1. BUSINESS DOMAINS - Main business areas
+2. CRITICAL RULES - Key business rules to test  
+3. PATTERNS - Architectural patterns used
+4. MAIN ENTITIES - Key models and relationships
+5. KEY SERVICES - Important business logic services
+6. EDGE CASES - Complex scenarios
+7. TESTING PRIORITIES - What to test first
 
-FILES:
-${JSON.stringify(files, null, 2).substring(0, 15000)}
+Look at app/Models, app/Services, app/Enums, routes/, and tests/ directories.
 
-Respond in this JSON format:
-{
-  "businessDomains": ["domain1", "domain2"],
-  "criticalRules": [
-    {
-      "description": "rule description",
-      "importance": "high|medium|low",
-      "testStrategy": "how to test this"
-    }
-  ],
-  "patterns": ["pattern1", "pattern2"],
-  "mainEntities": ["Entity1", "Entity2"],
-  "keyServices": ["Service1", "Service2"],
-  "edgeCases": ["case1", "case2"],
-  "testingPriorities": ["priority1", "priority2"]
-}`;
+Provide a concise summary focusing on the most important aspects for testing.`;
   }
 
   /**
