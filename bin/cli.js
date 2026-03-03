@@ -8,26 +8,26 @@ const program = new Command();
 
 program
   .name('aperto')
-  .description('Orchestrateur Universel de Projets')
+  .description('Universal Project Orchestrator')
   .version('1.0.0');
 
-// Commande par défaut
+// Default command
 program
   .command('start', { isDefault: true })
-  .description('Démarrer Aperto (mode par défaut)')
-  .option('-d, --dry-run', 'Afficher ce qui serait fait sans modifier')
+  .description('Start Aperto (default mode)')
+  .option('-d, --dry-run', 'Show what would be done without making changes')
   .action(async (options) => {
     try {
-      console.log(chalk.blue.bold('\n🌐 APERTO - Orchestrateur Intelligent\n'));
+      console.log(chalk.blue.bold('\n🌐 APERTO - Intelligent Orchestrator\n'));
       if (options.dryRun) {
-        console.log(chalk.yellow('⚠️  MODE DRY RUN - Aucune modification\n'));
+        console.log(chalk.yellow('⚠️  DRY RUN MODE - No changes will be made\n'));
       }
       
       const { ApertoOrchestrator } = require('../src/orchestrator');
       const orchestrator = new ApertoOrchestrator(process.cwd(), options);
       await orchestrator.run();
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       if (process.env.DEBUG) {
         console.error(error.stack);
       }
@@ -35,15 +35,15 @@ program
     }
   });
 
-// Commande intelligente
+// Smart command with AI
 program
   .command('smart')
-  .description('Analyse intelligente avec IA (comprend la logique métier)')
-  .option('-d, --dry-run', 'Afficher sans modifier')
+  .description('Deep AI analysis (understands business logic)')
+  .option('-d, --dry-run', 'Preview without making changes')
   .action(async (options) => {
     try {
-      console.log(chalk.blue.bold('\n🌐 APERTO - Analyse Intelligente\n'));
-      console.log(chalk.gray('Analyse approfondie avec intelligence artificielle\n'));
+      console.log(chalk.blue.bold('\n🌐 APERTO - Intelligent Analysis\n'));
+      console.log(chalk.gray('Deep analysis with artificial intelligence\n'));
       
       const { EchoTravelOrchestrator } = require('../src/echotravel-orchestrator');
       const orchestrator = new EchoTravelOrchestrator(process.cwd(), {
@@ -52,7 +52,7 @@ program
       });
       await orchestrator.run();
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       if (process.env.DEBUG) {
         console.error(error.stack);
       }
@@ -63,7 +63,7 @@ program
 // Init command
 program
   .command('init')
-  .description('Configurer Aperto (assistant interactif)')
+  .description('Configure Aperto (interactive assistant)')
   .action(async () => {
     try {
       const { execSync } = require('child_process');
@@ -75,7 +75,7 @@ program
         cwd: process.cwd()
       });
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -83,15 +83,15 @@ program
 // Analyze command
 program
   .command('analyze')
-  .description('Analyser le projet')
-  .option('-f, --format <type>', 'Format : console, markdown, json', 'console')
-  .option('-o, --output <fichier>', 'Nom du fichier de sortie')
+  .description('Analyze project')
+  .option('-f, --format <type>', 'Format: console, markdown, json', 'console')
+  .option('-o, --output <file>', 'Output file name')
   .action(async (options) => {
     try {
-      console.log(chalk.blue('\n🔍 Analyse du projet...\n'));
+      console.log(chalk.blue('\n🔍 Analyzing project...\n'));
       await aperto.analyze(options.format, options.output);
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -99,20 +99,20 @@ program
 // Run command
 program
   .command('run')
-  .description('Exécuter le workflow RED→GREEN')
-  .option('-m, --mode <mode>', 'Mode : auto, safe, confident', 'auto')
-  .option('-s, --scope <scope>', 'Scope cible')
-  .option('-d, --dry-run', 'Afficher sans modifier')
-  .option('-y, --yes', 'Ignorer les confirmations')
+  .description('Execute RED→GREEN workflow')
+  .option('-m, --mode <mode>', 'Mode: auto, safe, confident', 'auto')
+  .option('-s, --scope <scope>', 'Target scope')
+  .option('-d, --dry-run', 'Preview without making changes')
+  .option('-y, --yes', 'Skip confirmations')
   .action(async (options) => {
     try {
       if (options.dryRun) {
-        console.log(chalk.yellow('\n⚠️  MODE DRY RUN - Aucune modification\n'));
+        console.log(chalk.yellow('\n⚠️  DRY RUN MODE - No changes will be made\n'));
       }
-      console.log(chalk.blue('\n🚀 Lancement du workflow...\n'));
+      console.log(chalk.blue('\n🚀 Starting workflow...\n'));
       await aperto.run(options);
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       if (process.env.DEBUG) {
         console.error(error.stack);
       }
@@ -123,15 +123,15 @@ program
 // Audit command
 program
   .command('audit')
-  .description('Auditer le projet')
-  .option('-o, --output <fichier>', 'Fichier de sortie', 'APERTO_AUDIT')
-  .option('-f, --format <type>', 'Format : markdown, json', 'markdown')
+  .description('Audit project')
+  .option('-o, --output <file>', 'Output file', 'APERTO_AUDIT')
+  .option('-f, --format <type>', 'Format: markdown, json', 'markdown')
   .action(async (options) => {
     try {
-      console.log(chalk.blue('\n🔍 Audit du projet...\n'));
+      console.log(chalk.blue('\n🔍 Auditing project...\n'));
       await aperto.audit(options);
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -139,23 +139,23 @@ program
 // Scope command
 program
   .command('scope [name]')
-  .description('Travailler sur un scope spécifique')
-  .option('-d, --dry-run', 'Afficher sans modifier')
+  .description('Work on specific scope')
+  .option('-d, --dry-run', 'Preview without making changes')
   .action(async (name, options) => {
     try {
       if (options.dryRun) {
-        console.log(chalk.yellow('\n⚠️  MODE DRY RUN - Aucune modification\n'));
+        console.log(chalk.yellow('\n⚠️  DRY RUN MODE - No changes will be made\n'));
       }
       
       if (!name) {
-        console.log(chalk.blue('\n📦 Scopes disponibles :\n'));
+        console.log(chalk.blue('\n📦 Available scopes:\n'));
         await aperto.listScopes();
       } else {
-        console.log(chalk.blue(`\n🎯 Traitement du scope : ${name}\n`));
+        console.log(chalk.blue(`\n🎯 Working on scope: ${name}\n`));
         await aperto.workOnScope(name, options);
       }
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -163,13 +163,13 @@ program
 // Doctor command
 program
   .command('doctor')
-  .description('Diagnostics et vérifications')
+  .description('Diagnostics and checks')
   .action(async () => {
     try {
-      console.log(chalk.blue('\n🔧 Vérifications...\n'));
+      console.log(chalk.blue('\n🔧 Running diagnostics...\n'));
       await aperto.doctor();
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -177,12 +177,12 @@ program
 // Config command
 program
   .command('config')
-  .description('Afficher la configuration')
+  .description('Show configuration')
   .action(async () => {
     try {
       await aperto.showConfig();
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -190,12 +190,12 @@ program
 // LLM config command
 program
   .command('llm')
-  .description('Configurer l\'IA')
+  .description('Configure AI')
   .action(async () => {
     try {
       await aperto.configLLM();
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -203,12 +203,12 @@ program
 // Refactor command
 program
   .command('refactor')
-  .description('Suggestions de refactoring avec IA')
-  .option('-a, --apply', 'Appliquer les corrections')
-  .option('-d, --dry-run', 'Afficher sans appliquer')
+  .description('AI-powered refactoring suggestions')
+  .option('-a, --apply', 'Apply fixes')
+  .option('-d, --dry-run', 'Preview without applying')
   .action(async (options) => {
     try {
-      console.log(chalk.blue.bold('\n🔧 Refactoring avec IA\n'));
+      console.log(chalk.blue.bold('\n🔧 AI Refactoring\n'));
       
       const { LLMClient } = require('../src/llm');
       const { RefactoringAI } = require('../src/llm/refactoring-ai');
@@ -220,7 +220,7 @@ program
       }
       
       if (!config.llm?.enabled) {
-        console.log(chalk.yellow('⚠️  IA non configurée. Lancez : npx aperto init'));
+        console.log(chalk.yellow('⚠️  AI not configured. Run: npx aperto init'));
         return;
       }
       
@@ -233,7 +233,7 @@ program
       llm.printStats();
       
       if (options.apply) {
-        console.log(chalk.yellow('\n⚠️  Application des corrections...'));
+        console.log(chalk.yellow('\n⚠️  Applying fixes...'));
         
         for (const category of ['high', 'medium', 'low']) {
           for (const item of suggestions[category]) {
@@ -245,7 +245,7 @@ program
         }
       }
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
@@ -253,10 +253,10 @@ program
 // AI command
 program
   .command('ai')
-  .description('Analyse rapide avec IA')
+  .description('Quick AI analysis')
   .action(async () => {
     try {
-      console.log(chalk.blue.bold('\n🧠 Analyse IA rapide\n'));
+      console.log(chalk.blue.bold('\n🧠 Quick AI Analysis\n'));
       
       const { LLMClient } = require('../src/llm');
       const { AIAnalyzer } = require('../src/llm/analyzer');
@@ -268,7 +268,7 @@ program
       }
       
       if (!config.llm?.enabled) {
-        console.log(chalk.yellow('⚠️  IA non configurée. Lancez : npx aperto init'));
+        console.log(chalk.yellow('⚠️  AI not configured. Run: npx aperto init'));
         return;
       }
       
@@ -286,35 +286,35 @@ program
       const analysis = await analyzer.analyzeProject(context);
       
       if (analysis) {
-        console.log(chalk.blue('\n🏗️  Architecture :'), analysis.architecture);
-        console.log(chalk.blue('📊 Couverture :'), analysis.testCoverage);
+        console.log(chalk.blue('\n🏗️  Architecture:'), analysis.architecture);
+        console.log(chalk.blue('📊 Coverage:'), analysis.testCoverage);
         
         if (analysis.patterns?.length > 0) {
-          console.log(chalk.blue('\n🎨 Patterns :'));
+          console.log(chalk.blue('\n🎨 Patterns:'));
           analysis.patterns.forEach(p => console.log(`  • ${p}`));
         }
         
         if (analysis.criticalAreas?.length > 0) {
-          console.log(chalk.blue('\n⚠️  Zones critiques :'));
+          console.log(chalk.blue('\n⚠️  Critical areas:'));
           analysis.criticalAreas.forEach(a => console.log(`  • ${a}`));
         }
         
         if (analysis.suggestions?.length > 0) {
-          console.log(chalk.blue('\n💡 Suggestions :'));
+          console.log(chalk.blue('\n💡 Suggestions:'));
           analysis.suggestions.forEach(s => console.log(`  • ${s}`));
         }
       }
       
       llm.printStats();
     } catch (error) {
-      console.error(chalk.red('\n❌ Erreur :'), error.message);
+      console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
     }
   });
 
-// Gestion des erreurs globales
+// Global error handling
 process.on('unhandledRejection', (error) => {
-  console.error(chalk.red('\n❌ Erreur non gérée :'), error.message);
+  console.error(chalk.red('\n❌ Error:'), error.message);
   if (process.env.DEBUG) {
     console.error(error.stack);
   }
@@ -322,7 +322,7 @@ process.on('unhandledRejection', (error) => {
 });
 
 process.on('uncaughtException', (error) => {
-  console.error(chalk.red('\n❌ Exception :'), error.message);
+  console.error(chalk.red('\n❌ Error:'), error.message);
   if (process.env.DEBUG) {
     console.error(error.stack);
   }
