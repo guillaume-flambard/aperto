@@ -2,57 +2,33 @@
  * Kimi Provider - Integration with Moonshot AI's Kimi LLM
  * API Docs: https://platform.moonshot.cn/
  * 
- * Supports both:
- * - Standard API keys (sk-kimi-...)
- * - OAuth tokens from Kimi CLI (~/.kimi/credentials/)
+ * Uses standard API keys (sk-kimi-...)
+ * For OAuth authentication, use KimiCliProvider instead
  */
 
 const https = require('https');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
 
 class KimiProvider {
   constructor(config) {
-    // Try multiple auth sources in order of preference
-    this.apiKey = config.apiKey || this.loadOAuthToken() || this.loadEnvApiKey();
+    // Only use real API keys (sk-kimi-...), NOT OAuth tokens
+    // OAuth tokens should use KimiCliProvider instead
+    this.apiKey = config.apiKey || this.loadEnvApiKey();
     // Support for K2.5 and other models
     this.model = config.model || 'kimi-k2-turbo-preview';
     this.baseUrl = config.baseUrl || 'https://api.moonshot.ai';
     this.timeout = config.timeout || 60000;
-    this.useOAuth = !!this.loadOAuthToken();
   }
 
   /**
    * Load API key from environment variable
    */
   loadEnvApiKey() {
-    return process.env.APERTO_LLM_API_KEY || process.env.KIMI_API_KEY || null;
-  }
-
-  /**
-   * Load OAuth token from Kimi CLI credentials
-   */
-  loadOAuthToken() {
-    try {
-      const credentialsPath = path.join(os.homedir(), '.kimi', 'credentials', 'kimi-code.json');
-      if (fs.existsSync(credentialsPath)) {
-        const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-        if (credentials.access_token) {
-          // Check if token is expired
-          if (credentials.expires_at && credentials.expires_at < Date.now() / 1000) {
-            console.log('  [OAuth] Token expired, trying refresh...');
-            // Token is expired - we should refresh but for now just use it and let the API reject it
-            // The user can run `kimi login` to refresh
-          }
-          console.log('  [OAuth] Loaded Kimi CLI credentials');
-          return credentials.access_token;
-        }
-      }
-    } catch (error) {
-      // Silently fail - OAuth is optional
+    const key = process.env.APERTO_LLM_API_KEY || process.env.KIMI_API_KEY || null;
+    // Reject OAuth tokens (JWT format) - they should use KimiCliProvider
+    if (key && key.startsWith('eyJ')) {
+      return null;
     }
-    return null;
+    return key;
   }
 
   async send(prompt, options = {}) {

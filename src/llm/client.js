@@ -73,9 +73,12 @@ class LLMClient {
   createProvider() {
     switch (this.config.provider) {
       case 'kimi':
-        // Check if we have an API key - if not, try CLI
-        if (!this.config.apiKey && !process.env.APERTO_LLM_API_KEY) {
-          console.log(chalk.gray('  [OAuth] No API key found, trying Kimi CLI...'));
+        // Check if we have a real API key (not OAuth)
+        const apiKey = this.config.apiKey || process.env.APERTO_LLM_API_KEY;
+        const isOAuth = apiKey && apiKey.startsWith('eyJ'); // JWT format
+        
+        if (!apiKey || isOAuth) {
+          console.log(chalk.gray('  [OAuth] No API key found, using Kimi CLI...'));
           return new KimiCliProvider(this.config);
         }
         return new KimiProvider(this.config);
