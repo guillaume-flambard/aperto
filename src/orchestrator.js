@@ -401,7 +401,7 @@ class ${route.controller} extends Controller
   }
 
   async presentSuggestions() {
-    console.log(chalk.blue.bold('\n📋 Suggestions BMaD\n'));
+    console.log(chalk.blue.bold('\n📋 Suggestions\n'));
 
     if (this.analysis.suggestions.length === 0) {
       console.log(chalk.green('✅ Excellent ! Aucune suggestion - tout semble complet.\n'));
