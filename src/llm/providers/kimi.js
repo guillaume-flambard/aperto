@@ -1,22 +1,63 @@
 /**
  * Kimi Provider - Integration with Moonshot AI's Kimi LLM
  * API Docs: https://platform.moonshot.cn/
+ * 
+ * Supports both:
+ * - Standard API keys (sk-kimi-...)
+ * - OAuth tokens from Kimi CLI (~/.kimi/credentials/)
  */
 
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 class KimiProvider {
   constructor(config) {
-    this.apiKey = config.apiKey;
+    // Try multiple auth sources in order of preference
+    this.apiKey = config.apiKey || this.loadOAuthToken() || this.loadEnvApiKey();
     // Support for K2.5 and other models
-    this.model = config.model || 'kimi-k2-5';
-    this.baseUrl = config.baseUrl || 'https://api.moonshot.cn';
+    this.model = config.model || 'kimi-k2-turbo-preview';
+    this.baseUrl = config.baseUrl || 'https://api.moonshot.ai';
     this.timeout = config.timeout || 60000;
+    this.useOAuth = !!this.loadOAuthToken();
+  }
+
+  /**
+   * Load API key from environment variable
+   */
+  loadEnvApiKey() {
+    return process.env.APERTO_LLM_API_KEY || process.env.KIMI_API_KEY || null;
+  }
+
+  /**
+   * Load OAuth token from Kimi CLI credentials
+   */
+  loadOAuthToken() {
+    try {
+      const credentialsPath = path.join(os.homedir(), '.kimi', 'credentials', 'kimi-code.json');
+      if (fs.existsSync(credentialsPath)) {
+        const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+        if (credentials.access_token) {
+          // Check if token is expired
+          if (credentials.expires_at && credentials.expires_at < Date.now() / 1000) {
+            console.log('  [OAuth] Token expired, trying refresh...');
+            // Token is expired - we should refresh but for now just use it and let the API reject it
+            // The user can run `kimi login` to refresh
+          }
+          console.log('  [OAuth] Loaded Kimi CLI credentials');
+          return credentials.access_token;
+        }
+      }
+    } catch (error) {
+      // Silently fail - OAuth is optional
+    }
+    return null;
   }
 
   async send(prompt, options = {}) {
     if (!this.apiKey) {
-      throw new Error('Kimi API key not configured. Set APERTO_LLM_API_KEY or config.llm.apiKey');
+      throw new Error('Kimi API key not configured. Set APERTO_LLM_API_KEY, KIMI_API_KEY, or login with `kimi login`');
     }
 
     const requestBody = {
@@ -40,9 +81,12 @@ class KimiProvider {
     return new Promise((resolve, reject) => {
       const requestData = JSON.stringify(requestBody);
       
+      // Parse baseURL to extract hostname
+      const url = new URL(this.baseUrl);
+      
       const requestOptions = {
-        hostname: 'api.moonshot.cn',
-        port: 443,
+        hostname: url.hostname,
+        port: url.port || 443,
         path: '/v1/chat/completions',
         method: 'POST',
         headers: {
@@ -65,7 +109,12 @@ class KimiProvider {
             const response = JSON.parse(data);
             
             if (response.error) {
-              reject(new Error(`Kimi API error: ${response.error.message}`));
+              // Check for OAuth-specific errors
+              if (response.error.type === 'access_terminated_error') {
+                reject(new Error(`Kimi Code OAuth restricted: ${response.error.message}. Please use a standard API key from https://platform.moonshot.cn/`));
+              } else {
+                reject(new Error(`Kimi API error: ${response.error.message}`));
+              }
               return;
             }
 

@@ -7,12 +7,37 @@ const chalk = require('chalk');
 const crypto = require('crypto');
 const { LLMCache } = require('./cache');
 const { KimiProvider } = require('./providers/kimi');
+const { KimiCliProvider } = require('./providers/kimi-cli');
 const { OpenAIProvider } = require('./providers/openai');
 const { AnthropicProvider } = require('./providers/anthropic');
 const { OllamaProvider } = require('./providers/ollama');
 
+// Load .env file from .aperto/.env
+function loadEnvFile() {
+  try {
+    const envPath = path.join(process.cwd(), '.aperto', '.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      envContent.split('\n').forEach(line => {
+        const match = line.match(/^export\s+([A-Za-z0-9_]+)="([^"]*)"/);
+        if (match && !process.env[match[1]]) {
+          process.env[match[1]] = match[2];
+        }
+      });
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+}
+
+// Load env file on module load
+loadEnvFile();
+
 class LLMClient {
   constructor(config = {}) {
+    // Reload env file to get latest values
+    loadEnvFile();
+    
     this.config = {
       provider: config.provider || 'kimi',
       apiKey: config.apiKey || process.env.APERTO_LLM_API_KEY,
@@ -37,18 +62,26 @@ class LLMClient {
 
   getDefaultModel(provider) {
     const defaults = {
-      kimi: 'kimi-k2-5',
+      kimi: 'kimi-k2-turbo-preview',
       openai: 'gpt-4',
       anthropic: 'claude-3-opus-20240229',
       ollama: 'codellama'
     };
-    return defaults[provider] || 'kimi-k2-5';
+    return defaults[provider] || 'kimi-k2-turbo-preview';
   }
 
   createProvider() {
     switch (this.config.provider) {
       case 'kimi':
+        // Check if we have an API key - if not, try CLI
+        if (!this.config.apiKey && !process.env.APERTO_LLM_API_KEY) {
+          console.log(chalk.gray('  [OAuth] No API key found, trying Kimi CLI...'));
+          return new KimiCliProvider(this.config);
+        }
         return new KimiProvider(this.config);
+      case 'kimi-cli':
+        // Force use CLI provider
+        return new KimiCliProvider(this.config);
       case 'openai':
         return new OpenAIProvider(this.config);
       case 'anthropic':
