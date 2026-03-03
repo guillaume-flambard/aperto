@@ -103,33 +103,65 @@ class KimiCliProvider {
    * Parse Kimi CLI output to extract the actual response
    */
   parseKimiOutput(output) {
-    // Kimi CLI outputs structured data, try to extract just the text
-    // Look for TextPart or simple text output
+    // Kimi CLI outputs structured data with TextPart containing the response
+    // The text content can span multiple lines and include special characters
     
-    // First, try to find TextPart content
-    const textPartMatch = output.match(/TextPart\([^)]*text=['"]([^'"]+)['"]/);
-    if (textPartMatch) {
-      return textPartMatch[1];
+    // Extract all TextPart text fields - handle multiline content
+    const textParts = [];
+    
+    // Match TextPart with multiline text (using non-greedy match for text field)
+    const textPartRegex = /text=['"]([\s\S]*?)['"],?\s*\n/g;
+    let match;
+    
+    while ((match = textPartRegex.exec(output)) !== null) {
+      // Clean up the extracted text
+      let text = match[1]
+        .replace(/\\n/g, '\n')  // Unescape newlines
+        .replace(/\\"/g, '"')  // Unescape quotes
+        .replace(/\\'/g, "'");  // Unescape single quotes
+      textParts.push(text);
+    }
+    
+    if (textParts.length > 0) {
+      return textParts.join('\n');
     }
 
-    // Try to extract content between TurnBegin and TurnEnd
-    const turnMatch = output.match(/TurnBegin[\s\S]*?TurnEnd/);
-    if (turnMatch) {
-      // Extract text parts from the turn
-      const textMatches = turnMatch[0].match(/text=['"]([^'"]+)['"]/g);
-      if (textMatches) {
-        return textMatches
-          .map(m => m.replace(/text=['"]/, '').replace(/['"]$/, ''))
-          .join('\n');
+    // Fallback: Try to extract everything after the first TextPart header
+    const textIndex = output.indexOf('text=');
+    if (textIndex !== -1) {
+      // Find the end of the text value
+      let start = textIndex + 5; // Skip 'text='
+      let quote = output[start];
+      if (quote === '"' || quote === "'") {
+        start++;
+        let end = start;
+        let escaped = false;
+        
+        while (end < output.length) {
+          if (escaped) {
+            escaped = false;
+          } else if (output[end] === '\\') {
+            escaped = true;
+          } else if (output[end] === quote) {
+            break;
+          }
+          end++;
+        }
+        
+        return output.substring(start, end)
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
+          .replace(/\\'/g, "'");
       }
     }
 
-    // If we can't parse it, return the raw output
-    // Filter out metadata lines
+    // Last resort: return cleaned raw output
     return output
       .split('\n')
-      .filter(line => !line.match(/^(TurnBegin|TurnEnd|StepBegin|StatusUpdate|TokenUsage)/))
+      .filter(line => !line.match(/^(TurnBegin|TurnEnd|StepBegin|StatusUpdate|TokenUsage|ThinkPart)/))
       .filter(line => !line.match(/^\s*\w+Part\(/))
+      .filter(line => !line.match(/^\s*(type|think|text|encrypted)=/))
+      .filter(line => line.trim().length > 0)
       .join('\n')
       .trim();
   }

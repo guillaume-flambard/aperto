@@ -57,6 +57,17 @@ class EchoTravelOrchestrator {
   displayAnalysis(analysis) {
     console.log(chalk.green('\n✅ Analyse IA terminée\n'));
     
+    // If we have raw content (JSON parsing failed), display it
+    if (analysis.raw) {
+      console.log(chalk.blue('📝 Résultat de l\'analyse :\n'));
+      console.log(analysis.raw.substring(0, 2000)); // Show first 2000 chars
+      if (analysis.raw.length > 2000) {
+        console.log(chalk.gray('\n... (résultat tronqué, voir le fichier complet)'));
+      }
+      console.log('');
+      return;
+    }
+    
     if (analysis.businessDomains) {
       console.log(chalk.blue('🏢 Domaines métier identifiés:'));
       analysis.businessDomains.forEach(d => console.log(`  • ${d}`));
