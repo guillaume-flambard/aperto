@@ -35,6 +35,31 @@ program
     }
   });
 
+// EchoTravel-specific intelligent command
+program
+  .command('smart')
+  .description('Deep AI analysis for EchoTravel (auto-detects business logic)')
+  .option('-d, --dry-run', 'Show what would be done without making changes')
+  .action(async (options) => {
+    try {
+      console.log(chalk.blue.bold('\n🌐 APERTO - Analyse Intelligente EchoTravel\n'));
+      console.log(chalk.gray('Cette commande utilise l\'IA pour comprendre votre projet en profondeur\n'));
+      
+      const { EchoTravelOrchestrator } = require('../src/echotravel-orchestrator');
+      const orchestrator = new EchoTravelOrchestrator(process.cwd(), {
+        ...options,
+        useAI: true
+      });
+      await orchestrator.run();
+    } catch (error) {
+      console.error(chalk.red('\n❌ Error:'), error.message);
+      if (process.env.DEBUG) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
+
 // Init command
 program
   .command('init')
