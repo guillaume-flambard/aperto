@@ -37,12 +37,12 @@ class LLMClient {
 
   getDefaultModel(provider) {
     const defaults = {
-      kimi: 'kimi-latest',
+      kimi: 'kimi-k2-5',
       openai: 'gpt-4',
       anthropic: 'claude-3-opus-20240229',
       ollama: 'codellama'
     };
-    return defaults[provider] || 'kimi-latest';
+    return defaults[provider] || 'kimi-k2-5';
   }
 
   createProvider() {

@@ -8,7 +8,8 @@ const https = require('https');
 class KimiProvider {
   constructor(config) {
     this.apiKey = config.apiKey;
-    this.model = config.model || 'kimi-latest';
+    // Support for K2.5 and other models
+    this.model = config.model || 'kimi-k2-5';
     this.baseUrl = config.baseUrl || 'https://api.moonshot.cn';
     this.timeout = config.timeout || 60000;
   }
