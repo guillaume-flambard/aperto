@@ -60,14 +60,21 @@ program
     }
   });
 
-// Init command
+// Init command - Guided Setup Wizard
 program
   .command('init')
-  .description('Initialize Aperto configuration')
+  .description('Initialize Aperto with guided setup wizard')
   .action(async () => {
     try {
-      console.log(chalk.blue('\n🔧 Initializing Aperto...\n'));
-      await aperto.init();
+      // Lancer le wizard guidé
+      const { execSync } = require('child_process');
+      const path = require('path');
+      const wizardPath = path.join(__dirname, 'setup-wizard.js');
+      
+      execSync(`node "${wizardPath}"`, {
+        stdio: 'inherit',
+        cwd: process.cwd()
+      });
     } catch (error) {
       console.error(chalk.red('\n❌ Error:'), error.message);
       process.exit(1);
