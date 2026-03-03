@@ -32,30 +32,65 @@ class IntelligentProjectAnalyzer {
   }
 
   async collectProjectFiles() {
-    const patterns = [
-      'app/Models/*.php',
-      'app/Services/**/*.php',
-      'app/Actions/**/*.php',
-      'app/ValueObjects/**/*.php',
-      'app/Http/Controllers/**/*.php',
-      'tests/**/*Test.php'
-    ];
-
     const files = {};
     
-    for (const pattern of patterns) {
-      const globby = require('globby');
-      const paths = await globby(pattern, { cwd: this.projectPath });
+    // Collect files from key directories
+    const directories = [
+      { path: 'app/Models', limit: 20 },
+      { path: 'app/Services', limit: 15 },
+      { path: 'app/Actions', limit: 10 },
+      { path: 'app/ValueObjects', limit: 10 },
+      { path: 'app/Http/Controllers', limit: 20 },
+      { path: 'tests', limit: 15 }
+    ];
+
+    for (const dir of directories) {
+      const dirPath = path.join(this.projectPath, dir.path);
+      const key = dir.path;
+      files[key] = [];
       
-      files[pattern] = [];
-      for (const filePath of paths.slice(0, 20)) { // Limit to avoid token overflow
-        try {
-          const content = await fs.readFile(path.join(this.projectPath, filePath), 'utf8');
-          files[pattern].push({ path: filePath, content });
-        } catch (e) {}
+      try {
+        const phpFiles = await this.findPhpFiles(dirPath, dir.limit);
+        
+        for (const filePath of phpFiles) {
+          try {
+            const relativePath = path.relative(this.projectPath, filePath);
+            const content = await fs.readFile(filePath, 'utf8');
+            files[key].push({ path: relativePath, content });
+          } catch (e) {}
+        }
+      } catch (e) {
+        // Directory doesn't exist, skip
       }
     }
     
+    return files;
+  }
+
+  async findPhpFiles(dirPath, limit) {
+    const files = [];
+    
+    async function scan(currentPath) {
+      if (files.length >= limit) return;
+      
+      try {
+        const entries = await fs.readdir(currentPath, { withFileTypes: true });
+        
+        for (const entry of entries) {
+          if (files.length >= limit) break;
+          
+          const fullPath = path.join(currentPath, entry.name);
+          
+          if (entry.isDirectory()) {
+            await scan(fullPath);
+          } else if (entry.isFile() && entry.name.endsWith('.php')) {
+            files.push(fullPath);
+          }
+        }
+      } catch (e) {}
+    }
+    
+    await scan(dirPath);
     return files;
   }
 
