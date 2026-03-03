@@ -156,6 +156,146 @@ program
     }
   });
 
+// LLM config command
+program
+  .command('llm')
+  .description('Configure AI/LLM settings')
+  .action(async () => {
+    try {
+      await aperto.configLLM();
+    } catch (error) {
+      console.error(chalk.red('\n❌ Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Refactor command - AI-powered refactoring
+program
+  .command('refactor')
+  .description('AI-powered code refactoring suggestions')
+  .option('-a, --apply', 'Apply suggested fixes (use with caution)')
+  .option('-d, --dry-run', 'Show suggestions without applying')
+  .action(async (options) => {
+    try {
+      console.log(chalk.blue.bold('\n🔧 APERTO - AI Refactoring\n'));
+      
+      const { LLMClient } = require('../src/llm');
+      const { RefactoringAI } = require('../src/llm/refactoring-ai');
+      const fs = require('fs-extra');
+      
+      // Load config to get LLM settings
+      let config = {};
+      if (await fs.pathExists('.aperto/config.json')) {
+        config = await fs.readJson('.aperto/config.json');
+      }
+      
+      if (!config.llm?.enabled) {
+        console.log(chalk.yellow('⚠️  AI features not enabled. Run: aperto init'));
+        return;
+      }
+      
+      const llm = new LLMClient(config.llm);
+      const refactorAI = new RefactoringAI(llm, process.cwd());
+      
+      // Analyze project
+      const suggestions = await refactorAI.analyzeProject();
+      
+      // Display suggestions
+      refactorAI.displaySuggestions(suggestions);
+      
+      // Show LLM stats
+      llm.printStats();
+      
+      // Apply fixes if requested
+      if (options.apply) {
+        console.log(chalk.yellow('\n⚠️  Applying fixes...'));
+        
+        for (const category of ['high', 'medium', 'low']) {
+          for (const item of suggestions[category]) {
+            const fix = await refactorAI.generateFix(item.file, item);
+            if (fix) {
+              await refactorAI.applyFix(item.file, fix, options.dryRun);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('\n❌ Error:'), error.message);
+      if (process.env.DEBUG) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
+
+// AI command - Quick AI analysis
+program
+  .command('ai')
+  .description('Quick AI-powered analysis')
+  .action(async () => {
+    try {
+      console.log(chalk.blue.bold('\n🧠 APERTO - AI Quick Analysis\n'));
+      
+      const { LLMClient } = require('../src/llm');
+      const { AIAnalyzer } = require('../src/llm/analyzer');
+      const fs = require('fs-extra');
+      
+      // Load config
+      let config = {};
+      if (await fs.pathExists('.aperto/config.json')) {
+        config = await fs.readJson('.aperto/config.json');
+      }
+      
+      if (!config.llm?.enabled) {
+        console.log(chalk.yellow('⚠️  AI features not enabled. Run: aperto init'));
+        return;
+      }
+      
+      const llm = new LLMClient(config.llm);
+      const analyzer = new AIAnalyzer(llm, process.cwd());
+      
+      // Basic project context
+      const context = {
+        stack: { name: 'laravel' },
+        files: 0,
+        routes: [],
+        controllers: [],
+        models: []
+      };
+      
+      // AI analysis
+      const analysis = await analyzer.analyzeProject(context);
+      
+      if (analysis) {
+        console.log(chalk.blue('\n🏗️  Architecture:'), analysis.architecture);
+        console.log(chalk.blue('📊 Test Coverage:'), analysis.testCoverage);
+        
+        if (analysis.patterns?.length > 0) {
+          console.log(chalk.blue('\n🎨 Patterns detected:'));
+          analysis.patterns.forEach(p => console.log(`  • ${p}`));
+        }
+        
+        if (analysis.criticalAreas?.length > 0) {
+          console.log(chalk.blue('\n⚠️  Critical areas:'));
+          analysis.criticalAreas.forEach(a => console.log(`  • ${a}`));
+        }
+        
+        if (analysis.suggestions?.length > 0) {
+          console.log(chalk.blue('\n💡 AI Suggestions:'));
+          analysis.suggestions.forEach(s => console.log(`  • ${s}`));
+        }
+      }
+      
+      llm.printStats();
+    } catch (error) {
+      console.error(chalk.red('\n❌ Error:'), error.message);
+      if (process.env.DEBUG) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  });
+
 // Global error handling
 process.on('unhandledRejection', (error) => {
   console.error(chalk.red('\n❌ Unhandled error:'), error.message);

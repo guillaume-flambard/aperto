@@ -4,10 +4,12 @@ const { detectStack } = require('./core/detector');
 const { analyzeProject } = require('./core/analyzer');
 const { selectStrategy } = require('./core/strategist');
 const { validateChanges } = require('./core/validator');
-const { initPrompts } = require('./ui/prompts');
+const { initPrompts, llmConfigPrompts } = require('./ui/prompts');
 const { generateReport } = require('./reporters/report-generator');
 const { AdapterFactory } = require('./adapters');
 const { TestGenerator, ImplementationGenerator } = require('./generators');
+const { LLMClient } = require('./llm');
+const { IntelligentTestGenerator } = require('./llm/intelligent-test-generator');
 const fs = require('fs-extra');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -195,12 +197,73 @@ class Aperto {
     
     console.log(chalk.gray('  Configuration file: .aperto/config.json\n'));
     
+    // Show general config
+    console.log(chalk.cyan('General:'));
     Object.entries(this.config).forEach(([key, value]) => {
+      if (key === 'llm') return; // Handle LLM separately
+      
       const formattedValue = typeof value === 'boolean' ? 
         (value ? chalk.green('true') : chalk.red('false')) : 
         chalk.cyan(value);
       console.log(`  ${key.padEnd(20)} ${formattedValue}`);
     });
+    
+    // Show LLM config
+    if (this.config.llm) {
+      console.log(chalk.cyan('\nAI/LLM:'));
+      const llm = this.config.llm;
+      console.log(`  ${'enabled'.padEnd(20)} ${llm.enabled ? chalk.green('true') : chalk.red('false')}`);
+      
+      if (llm.enabled) {
+        console.log(`  ${'provider'.padEnd(20)} ${chalk.cyan(llm.provider || 'kimi')}`);
+        console.log(`  ${'model'.padEnd(20)} ${chalk.cyan(llm.model || 'default')}`);
+        if (llm.baseUrl) {
+          console.log(`  ${'baseUrl'.padEnd(20)} ${chalk.cyan(llm.baseUrl)}`);
+        }
+        console.log(`  ${'apiKey'.padEnd(20)} ${llm.apiKey ? chalk.green('✓ configured') : chalk.yellow('⚠ env var')}`);
+      }
+    }
+    
+    console.log('');
+  }
+
+  async configLLM() {
+    await this.loadConfig();
+    
+    if (!this.config) {
+      this.logger.error('\n❌ No configuration found. Run: npx aperto init\n');
+      return;
+    }
+    
+    console.log(chalk.blue('\n🔧 Configure AI/LLM Settings\n'));
+    
+    const llmConfig = await llmConfigPrompts(this.config.llm || {});
+    
+    this.config.llm = llmConfig;
+    
+    await fs.writeJson('.aperto/config.json', this.config, { spaces: 2 });
+    
+    this.logger.success('\n✅ LLM configuration updated!');
+    
+    // Test the configuration
+    if (llmConfig.enabled) {
+      console.log(chalk.blue('\n🧪 Testing LLM connection...'));
+      
+      try {
+        const { LLMClient } = require('./llm');
+        const llm = new LLMClient(llmConfig);
+        
+        // Quick validation
+        const testResponse = await llm.sendPrompt('Hello', { maxTokens: 10 });
+        
+        this.logger.success('✅ LLM connection successful!');
+        console.log(chalk.gray(`  Response: "${testResponse.content.substring(0, 50)}..."`));
+        console.log(chalk.gray(`  Tokens: ${testResponse.tokens}`));
+      } catch (error) {
+        this.logger.error(`\n❌ LLM connection failed: ${error.message}`);
+        console.log(chalk.yellow('Please check your API key and provider settings.\n'));
+      }
+    }
     
     console.log('');
   }
@@ -445,12 +508,59 @@ class Aperto {
       this.logger.dryRun(`  - Stack: ${info.stack.name}`);
     }
     
-    const testGenerator = new TestGenerator(process.cwd(), this.adapter, {
-      overwrite: mode === 'confident',
-      dryRun: this.dryRun
-    });
+    let testFiles = [];
+    const useAI = this.config?.llm?.enabled && this.config?.llm?.provider !== 'ollama';
     
-    const testFiles = await testGenerator.generateTestsForScope(scope);
+    if (useAI) {
+      // Use AI-powered test generation
+      console.log(chalk.cyan('  🧠 Using AI for intelligent test generation...\n'));
+      
+      try {
+        const llm = new LLMClient(this.config.llm);
+        const aiTestGenerator = new IntelligentTestGenerator(
+          process.cwd(),
+          this.adapter,
+          {
+            overwrite: mode === 'confident',
+            dryRun: this.dryRun,
+            llmClient: llm,
+            useAI: true
+          }
+        );
+        
+        testFiles = await aiTestGenerator.generateTestsForScope(scope);
+        
+        // Write test files
+        for (const testCase of testFiles) {
+          const result = await aiTestGenerator.writeTestFile(testCase);
+          if (!result.skipped) {
+            aiTestGenerator.generatedFiles.push(result);
+          }
+        }
+        
+        // Show AI stats
+        const stats = aiTestGenerator.getSummary();
+        console.log(chalk.blue(`\n  📊 Test Generation Stats:`));
+        console.log(`     AI-generated: ${stats.aiGenerated}`);
+        console.log(`     Template: ${stats.templateGenerated}`);
+        
+        llm.printStats();
+      } catch (error) {
+        console.log(chalk.yellow(`  ⚠️  AI generation failed: ${error.message}`));
+        console.log(chalk.yellow('  Falling back to template generation...\n'));
+        useAI = false;
+      }
+    }
+    
+    if (!useAI) {
+      // Use traditional test generation
+      const testGenerator = new TestGenerator(process.cwd(), this.adapter, {
+        overwrite: mode === 'confident',
+        dryRun: this.dryRun
+      });
+      
+      testFiles = await testGenerator.generateTestsForScope(scope);
+    }
     
     if (testFiles.length === 0) {
       this.logger.warning('\n  ⚠️  No new tests needed - all routes already have tests\n');
